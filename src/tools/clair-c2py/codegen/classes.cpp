@@ -306,7 +306,7 @@ str_t codegen_cls(std::ostream &code, str_t const &cls_py_name, cls_info_t const
     std::stringstream MethodDecls, MethodTable, MethodDocs;
 
     // ---- constructor
-    if (cls_info.synthetize_init_from_pydict() and not(cls_info.fields.empty())) {
+    if (cls_info.constructors.empty() and cls_info.synthetize_init_from_pydict() and not(cls_info.fields.empty())) {
       codegen_synth_constructor(MethodDecls, cls_info, cls_alias, cls_full_name);
     } else
       codegen::write_dispatch_constructors(MethodDecls, cls_alias, cls_full_name, cls_info.constructors);

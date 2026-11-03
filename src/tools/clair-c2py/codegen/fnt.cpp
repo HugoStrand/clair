@@ -175,12 +175,10 @@ void codegen::write_dispatch_constructors(std::ostream &code, std::string const 
     if (llvm::dyn_cast_or_null<clang::CXXConstructorDecl>(f))
       return fmt::format(R"RAW( c2py::c_constructor<{}{}{}>({}))RAW", cls_cpp_name, comma_if(targs), targs, args);
     else {
-      if (f->isTemplateInstantiation())
-        return fmt::format(R"RAW( c2py::c_maker<{}>( {}<{}> {} {}))RAW", cls_cpp_name, f->getQualifiedNameAsString(), fnt_tparams(f), comma_if(args),
-                           args);
-      else
-        return fmt::format(R"RAW( c2py::c_maker<{}>( c2py::cast<{}>({}) {} {} ))RAW", cls_cpp_name, fnt_paramtypes(f), f->getQualifiedNameAsString(),
-                           comma_if(args), args);
+      auto name = f->getQualifiedNameAsString();
+      if (f->getTemplateSpecializationArgs()) name += "<" + fnt_tparams(f) + ">";
+      return fmt::format(R"RAW( c2py::c_maker<{}>( static_cast<{} (*)({})>(&{}) {} {} ))RAW", cls_cpp_name, cls_cpp_name, fnt_paramtypes(f), name,
+                         comma_if(args), args);
     }
   };
 

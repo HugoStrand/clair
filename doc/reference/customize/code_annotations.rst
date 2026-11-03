@@ -27,6 +27,10 @@ which are ignored by the C++ compiler, but picked up by ``clair`` during its ana
       - Transform a function into a method to the first argument's class.
       
         :ref:`Example <example_wrap_as_method>`
+    * - ``C2PY_ANNOTATE("c2py_wrap_as_constructor")``
+      - Use a free function as a constructor of its wrapped by-value return class.
+
+        :ref:`Factory-backed constructors <factory_constructors>`
     * - ``C2PY_MODULE_INIT``
       - Mark a function to be called when the module is imported.
 
@@ -39,5 +43,7 @@ which are ignored by the C++ compiler, but picked up by ``clair`` during its ana
       - Keep accepting deprecated parameter names, mapping each ``old`` name to its current ``new`` name.
 
 .. note::
-    These annotations overrule any options in the TOML file (Cf :ref:`toml_options`).
+    Annotations customize declarations selected for wrapping. Constructor factories
+    still obey the file, namespace, and name filters in the TOML file
+    (see :ref:`toml_options`).
 

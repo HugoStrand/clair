@@ -252,9 +252,45 @@ template <> void matcher<mtch::Fnt>::run(const MatchResult &Result) {
       return;
     }
 
+  // An annotation may appear only on a later declaration of the same factory.
+  const bool is_factory = llvm::any_of(f->redecls(), [](auto *d) { return clu::has_annotation(d, "c2py_wrap_as_constructor"); });
+
   // Special treatment for operator
   if (f->getNameAsString().starts_with("operator")) {
+    if (is_factory) {
+      clu::emit_error(f, "c2py: Constructor factory cannot be an operator");
+      return;
+    }
     analyze_operator(f, *wdata);
+    return;
+  }
+
+  // ---- free function used as a constructor of its exact by-value return class
+  if (is_factory) {
+    const bool conflicting_role = llvm::any_of(f->redecls(), [](auto *d) {
+      return clu::has_annotation(d, "c2py_wrap_as_method") or clu::has_annotation(d, "c2py_module_init")
+         or clu::get_annotation_value(d, "c2py_property_get") or clu::get_annotation_value(d, "c2py_property_set");
+    });
+    if (conflicting_role) {
+      clu::emit_error(f, "c2py: Constructor factory cannot also be a method, property, or module initializer");
+      return;
+    }
+    // c_maker needs a function pointer, so an ADL-only hidden friend is not sufficient.
+    if (llvm::all_of(f->redecls(), [](auto *d) { return d->getLexicalDeclContext()->isRecord(); })) {
+      clu::emit_error(f, "c2py: Constructor factory needs a namespace-scope declaration");
+      return;
+    }
+    auto type = f->getReturnType().getCanonicalType();
+    if (type->isReferenceType() or type->isPointerType() or type.hasQualifiers()) {
+      clu::emit_error(f, "c2py: Constructor factory must return an unqualified wrapped class by value");
+      return;
+    }
+    auto *cli = M.get_wrapped_cls_info(type);
+    if (not cli) {
+      clu::emit_error(f, "c2py: Constructor factory return type is not a class being wrapped");
+      return;
+    }
+    if (check_convertibility(f, *wdata, false)) cli->constructors.push_back(fnt_info_t{.ptr = f, .rewrite = false});
     return;
   }
 

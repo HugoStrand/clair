@@ -1,0 +1,2 @@
+# Classes are selected through aliases; only these actual namespace functions match.
+match_names = "factory_test::(make_product|make_aggregate|make_implicit|make_explicit|construction_count|destruction_count)$"

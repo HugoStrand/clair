@@ -10,6 +10,9 @@ Constructors
    ``clair-c2py`` synthesizes a constructor from a Python dict, 
    mimicking in Python the C++ aggregate initialization syntax.
 
+#. An annotated free function can provide a constructor for its wrapped return class.
+   Registered factories take precedence over synthesized aggregate constructors.
+
 User-defined constructors
 -------------------------
 
@@ -35,6 +38,60 @@ In Python, we get:
    >>> p3 = Point(x=1.0, y=2.0)  # Keyword arguments
    >>> print(p1.x(), p1.y())
    0.0 0.0
+
+
+.. _factory_constructors:
+
+Factory-backed constructors
+---------------------------
+
+Use ``C2PY_ANNOTATE("c2py_wrap_as_constructor")`` to construct a wrapped class
+through a free function. The function becomes a Python constructor overload for
+its return class; it is not also exported as a module function.
+
+.. code-block:: cpp
+
+   #include <c2py/c2py.hpp>
+
+   struct Value {
+     int value;
+     C2PY_IGNORE explicit Value(int x) : value(x) {}
+   };
+
+   C2PY_ANNOTATE("c2py_wrap_as_constructor")
+   Value make_value(int value, int scale = 1) {
+     return Value{value * scale};
+   }
+
+The ignored C++ constructor remains available to the factory. Python calls the
+factory using the class name, with the factory's parameter names and defaults:
+
+.. code-block:: python
+
+   x = Value(value=3, scale=2)
+   assert x.value == 6
+
+The factory must return the exact class wrapped in this module, by value,
+without ``const`` or ``volatile`` qualification. References, pointers, and
+unwrapped return types are rejected. It must have a namespace-scope declaration;
+member functions and operators cannot be used as factories. Its parameters must be convertible from
+Python, as for ordinary wrapped functions.
+
+Other public, nonignored C++ constructors remain available alongside the factory
+overloads. No additional default constructor is synthesized when factories are
+registered; an explicitly declared, nonignored default constructor is still
+wrapped. For aggregates, factories replace the synthesized dictionary
+constructor described below.
+
+Factories follow the usual file, namespace, and name selection rules, including
+``C2PY_IGNORE``. Function templates require :ref:`explicit instantiation
+<function_templates>`. Overloaded factories, keyword arguments, and default
+arguments use the usual constructor dispatch.
+
+The binding uses ``c2py::c_maker`` to construct the factory result directly in
+Python-owned storage. Returning a prvalue, as in ``return Value{...};`` above,
+avoids copying or moving that result through C++ guaranteed copy elision.
+Returning a named local instead relies on optional return-value optimization.
 
 
 Synthesized aggregate constructor

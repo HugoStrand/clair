@@ -47,6 +47,10 @@ static void analyze_one_method(clang::FunctionDecl const *f, cls_info_t &cls_inf
   if (f->isDeleted()) return;
   auto *m = llvm::dyn_cast<clang::CXXMethodDecl>(f);
   if (!m) return;
+  if (clu::has_annotation(m, "c2py_wrap_as_constructor")) {
+    clu::emit_error(m, "c2py: Constructor factory annotation requires a free function");
+    return;
+  }
   if (llvm::isa<clang::CXXDestructorDecl>(m)) return;                   // no destructors
   if (m->isMoveAssignmentOperator()) return;                            // no move assign
   if (auto *ctr = llvm::dyn_cast_or_null<clang::CXXConstructorDecl>(m); //
@@ -60,6 +64,9 @@ static void analyze_one_method(clang::FunctionDecl const *f, cls_info_t &cls_inf
 
   // ---- constructors
   if (llvm::isa<clang::CXXConstructorDecl>(m)) {
+    // A factory may instantiate an implicit default constructor internally without exposing it to Python.
+    const bool has_factory = llvm::any_of(cls_info.constructors, [](auto const &f) { return not llvm::isa<clang::CXXConstructorDecl>(f.ptr); });
+    if (m->isImplicit() and has_factory) return;
     const bool is_base_class = (cls != cls_info.ptr);
     if (not is_base_class and check_convertibility(m, wd)) cls_info.constructors.push_back({m});
     return;
@@ -181,6 +188,8 @@ static void scan_class(wdata_t &wd, cls_info_t &cls_info) {
     v = make_unique_decls(v);
     v = rm_const_overloads(v);
   }
+
+  cls_info.constructors = make_unique_decls(cls_info.constructors);
 
   // Check that the class is default constructible if it has no wrapped constructors
   if (cls_info.constructors.empty() and not cls_info.synthetize_init_from_pydict()
